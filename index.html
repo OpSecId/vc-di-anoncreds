@@ -222,26 +222,43 @@
         <section id="context">
           <h4>@context</h4>
           <p>
-            For Verifiable Credentials Data Model <strong>v1.1</strong>, the
-            <code>@context</code> array <em class="rfc2119">MUST</em> include:
+            Documents using the <a>anoncreds-2023 cryptosuite</a> are
+            [[VC-DATA-MODEL]] (or [[VC-DATA-MODEL-2.0]]) documents. The
+            <code>@context</code> array <em class="rfc2119">MUST</em> satisfy the
+            requirements of the applicable verifiable credentials data model
+            version, including that every term used in the document is defined
+            through one or more JSON-LD contexts as described in those
+            specifications.
           </p>
-          <ul>
-            <li><code>https://www.w3.org/2018/credentials/v1</code></li>
-            <li><code>https://w3id.org/security/data-integrity/v2</code></li>
-            <li><code>{ "@vocab": "https://www.w3.org/ns/credentials/issuer-dependent#" }</code></li>
-          </ul>
           <p>
-            For <strong>v2.0</strong>, the <code>@context</code> array
-            <em class="rfc2119">MUST</em> include:
+            In particular, implementers <em class="rfc2119">MUST</em> ensure that
+            <code>DataIntegrityProof</code> and its properties
+            (<code>cryptosuite</code>, <code>proofPurpose</code>,
+            <code>proofValue</code>, <code>verificationMethod</code>, and
+            <code>challenge</code> where used) are mapped to IRIs through
+            <code>@context</code> in a way that is safe for their processing
+            environment. Conforming processors that perform JSON-LD processing
+            <em class="rfc2119">SHOULD</em> run context validation as described
+            in [[VC-DATA-INTEGRITY]] or apply equivalent protections.
           </p>
-          <ul>
-            <li><code>https://www.w3.org/ns/credentials/v2</code></li>
-            <li><code>{ "@vocab": "https://www.w3.org/ns/credentials/issuer-dependent#" }</code></li>
-          </ul>
           <p>
-            The Data Integrity context is included in the v2.0 base context and is
-            not repeated separately.
+            This specification does not define a dedicated AnonCreds JSON-LD
+            context and does not prescribe a fixed <code>@context</code> list.
+            Issuers and wallets choose contexts that define credential vocabulary
+            (for example issuer-dependent terms for
+            <code>credentialSubject</code> properties) alongside the base
+            verifiable credentials context for the target data model version.
           </p>
+          <aside class="example" id="example-context-rs">
+            <p>
+              The <a href="https://github.com/hyperledger/anoncreds-rs">anoncreds-rs</a>
+              reference implementation, when generating documents, uses the
+              contexts shown in
+              <a href="https://github.com/OpSecId/vc-di-anoncreds/blob/main/examples/sample_credential.json"><code>examples/sample_credential.json</code></a>.
+              That choice is illustrative; other valid context arrangements are
+              permitted if they meet the requirements above.
+            </p>
+          </aside>
         </section>
 
         <section id="types">
