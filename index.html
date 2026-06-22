@@ -56,7 +56,18 @@
         padding: 0.4em 0.6em;
         vertical-align: top;
       }
-      table.parameters th { background: #f4f4f4; }
+      ol.algorithm {
+        counter-reset: numsection;
+        list-style-type: none;
+      }
+      ol.algorithm li {
+        margin: 0.5em 0;
+      }
+      ol.algorithm li:before {
+        font-weight: bold;
+        counter-increment: numsection;
+        content: counters(numsection, ".") ") ";
+      }
     </style>
   </head>
   <body>
@@ -393,10 +404,25 @@
       <section id="instantiate-cryptosuite">
         <h3>Instantiate Cryptosuite</h3>
         <p>
-          <em>To be defined.</em> Maps <code>cryptosuite: anoncreds-2023</code> to
-          <code>createProof</code> and <code>verifyProof</code> per
-          [[VC-DATA-INTEGRITY]] §3.
+          This algorithm configures the <a>anoncreds-2023 cryptosuite</a> for use with
+          the Add Proof and Verify Proof functions in [[VC-DATA-INTEGRITY]]. The
+          algorithm takes an <code>options</code> object as input and returns a
+          <dfn>cryptosuite instance</dfn>.
         </p>
+        <ol class="algorithm">
+          <li>Initialize <code>cryptosuite</code> to an empty struct.</li>
+          <li>If <code>options.type</code> is not <code>DataIntegrityProof</code>, return
+            <code>cryptosuite</code>.</li>
+          <li>If <code>options.cryptosuite</code> is <code>anoncreds-2023</code>, then:
+            <ol>
+              <li>Set <code>cryptosuite.createProof</code> to the algorithm in
+                <a href="#create-proof-anoncreds-2023"></a>.</li>
+              <li>Set <code>cryptosuite.verifyProof</code> to the algorithm in
+                <a href="#verify-proof-anoncreds-2023"></a> (<em>to be defined</em>).</li>
+            </ol>
+          </li>
+          <li>Return <code>cryptosuite</code>.</li>
+        </ol>
       </section>
 
       <section id="anoncreds-2023-functions">
@@ -517,11 +543,276 @@
       <section id="anoncreds-2023">
         <h3>anoncreds-2023</h3>
         <p>
-          <em>To be defined.</em> Create Proof and Verify Proof algorithms delegating
-          to [[ANONCREDS]] issuance and presentation verification, using
-          <a href="#serialize-proof-value">serializeProofValue</a> and
-          <a href="#parse-proof-value">parseProofValue</a>.
+          The <a>anoncreds-2023 cryptosuite</a> produces proofs by running AnonCreds CL
+          operations defined in [[ANONCREDS]] and serializing the result with
+          <a href="#serialize-proof-value">serializeProofValue</a>. Unlike suites that
+          canonicalize the JSON-LD document (for example <code>bbs-2023</code>), this
+          suite signs encoded attribute material and CL proof objects; the verifiable
+          credential document fields are bound through the AnonCreds issuance and
+          presentation protocols, not through RDF Dataset Canonicalization.
         </p>
+
+        <section id="proof-configuration">
+          <h4>Proof Configuration (anoncreds-2023)</h4>
+          <p>
+            The following algorithm validates proof options before proof generation.
+            Required inputs are <dfn>proof options</dfn> (<code>options</code>) and an
+            <dfn>operation</dfn> string. A <dfn>proof configuration</dfn> object is
+            produced as output.
+          </p>
+          <p>
+            The <code>operation</code> parameter <em class="rfc2119">MUST</em> be one of:
+            <code>issueCredential</code>, <code>processCredential</code>, or
+            <code>createPresentation</code>.
+          </p>
+          <ol class="algorithm">
+            <li>Let <code>proofConfig</code> be a shallow copy of <code>options</code>.</li>
+            <li>If <code>proofConfig.type</code> is not <code>DataIntegrityProof</code>
+              and/or <code>proofConfig.cryptosuite</code> is not
+              <code>anoncreds-2023</code>, an error <em class="rfc2119">MUST</em> be
+              raised.</li>
+            <li>If <code>operation</code> is <code>issueCredential</code> or
+              <code>processCredential</code>, set <code>proofConfig.proofPurpose</code>
+              to <code>assertionMethod</code>.</li>
+            <li>If <code>operation</code> is <code>createPresentation</code>, set
+              <code>proofConfig.proofPurpose</code> to
+              <code>authentication</code>.</li>
+            <li>Return <code>proofConfig</code>.</li>
+          </ol>
+        </section>
+
+        <section id="encode-credential-attributes">
+          <h4>Encode Credential Attributes (anoncreds-2023)</h4>
+          <p>
+            The following algorithm prepares <code>credentialSubject</code> claim values
+            for CL processing. Required input is a <code>credentialSubject</code> map.
+            An <dfn>encoded credential values</dfn> object is produced as output.
+          </p>
+          <ol class="algorithm">
+            <li>For each claim in <code>credentialSubject</code>, derive the encoded
+              integer representation using the attribute encoding rules in
+              [[ANONCREDS]].</li>
+            <li>Return the encoded credential values structure used by AnonCreds
+              issuance and presentation APIs.</li>
+          </ol>
+        </section>
+
+        <section id="create-proof-anoncreds-2023">
+          <h4>Create Proof (anoncreds-2023)</h4>
+          <p>
+            The following algorithm is the <code>createProof</code> entry point for this
+            cryptosuite. It dispatches by <code>options.operation</code>. Required
+            inputs are an <dfn>input document</dfn> (<code>inputDocument</code>) and
+            proof options (<code>options</code>). A <code>proof</code> map or an error
+            is produced as output.
+          </p>
+          <ol class="algorithm">
+            <li>If <code>options.operation</code> is <code>issueCredential</code>, return
+              the result of
+              <a href="#create-credential-issuance-proof">Create Credential Issuance Proof</a>
+              with <code>inputDocument</code> and <code>options</code>.</li>
+            <li>If <code>options.operation</code> is <code>processCredential</code>,
+              return the result of
+              <a href="#create-credential-processing-proof">Create Credential Processing Proof</a>
+              with <code>inputDocument</code> and <code>options</code>.</li>
+            <li>If <code>options.operation</code> is <code>createPresentation</code>,
+              return the result of
+              <a href="#create-presentation-proofs">Create Presentation Proofs</a>
+              with <code>inputDocument</code> and <code>options</code>.</li>
+            <li>Otherwise, an error <em class="rfc2119">MUST</em> be raised.</li>
+          </ol>
+        </section>
+
+        <section id="create-credential-issuance-proof">
+          <h4>Create Credential Issuance Proof (anoncreds-2023)</h4>
+          <p>
+            Called by an [[ANONCREDS]] issuer when creating a new verifiable credential.
+            Required inputs are an unsecured credential document
+            (<code>unsecuredDocument</code>) without a proof, proof options
+            (<code>options</code>), and AnonCreds issuance parameters:
+          </p>
+          <ul>
+            <li><code>credentialDefinition</code> and <code>credentialDefinitionPrivate</code></li>
+            <li><code>credentialOffer</code> and <code>credentialRequest</code></li>
+            <li><code>revocationConfig</code> (optional)</li>
+          </ul>
+          <p>
+            A <code>DataIntegrityProof</code> with <a>proof tag</a> <code>1</code> is
+            produced as output. This matches
+            <code>w3c::issuer::create_credential</code> in anoncreds-rs.
+          </p>
+          <ol class="algorithm">
+            <li>Let <code>proof</code> be the result of
+              <a href="#proof-configuration">Proof Configuration</a> with
+              <code>options</code> and <code>issueCredential</code>.</li>
+            <li>Let <code>encodedValues</code> be the result of
+              <a href="#encode-credential-attributes">Encode Credential Attributes</a>
+              with <code>unsecuredDocument.credentialSubject</code>.</li>
+            <li>Let <code>clProof</code> be the CL credential signature, signature
+              correctness proof, and optional revocation material produced by the
+              [[ANONCREDS]] credential issuance procedure using
+              <code>credentialOffer</code>, <code>credentialRequest</code>,
+              <code>encodedValues</code>, and <code>revocationConfig</code>.</li>
+            <li>Let <code>payload</code> be an object with:
+              <ul>
+                <li><code>schema_id</code> from <code>credentialOffer.schema_id</code></li>
+                <li><code>cred_def_id</code> from <code>credentialOffer.cred_def_id</code></li>
+                <li><code>signature</code> and <code>signature_correctness_proof</code> from <code>clProof</code></li>
+                <li>if revocable: <code>rev_reg_id</code>, <code>rev_reg</code>, and <code>witness</code> from <code>clProof</code></li>
+              </ul>
+            </li>
+            <li>Set <code>proof.verificationMethod</code> to
+              <code>payload.cred_def_id</code>.</li>
+            <li>Set <code>proof.proofValue</code> to the result of
+              <a href="#serialize-proof-value">serializeProofValue</a> with tag
+              <code>1</code> and <code>payload</code>.</li>
+            <li>Return <code>proof</code>.</li>
+          </ol>
+        </section>
+
+        <section id="create-credential-processing-proof">
+          <h4>Create Credential Processing Proof (anoncreds-2023)</h4>
+          <p>
+            Called by the [[ANONCREDS]] holder after receiving a credential from the
+            issuer. The holder unblinds the CL signature and replaces the existing tag
+            <code>1</code> proof. Required inputs are a secured credential document
+            (<code>securedDocument</code>) containing a tag <code>1</code> proof, proof
+            options (<code>options</code>), and:
+          </p>
+          <ul>
+            <li><code>credentialRequestMetadata</code></li>
+            <li><code>linkSecret</code></li>
+            <li><code>credentialDefinition</code></li>
+            <li><code>revocationRegistryDefinition</code> (optional)</li>
+          </ul>
+          <p>
+            An updated <code>DataIntegrityProof</code> with tag <code>1</code> is
+            produced as output. This matches
+            <code>w3c::prover::process_credential</code> in anoncreds-rs.
+          </p>
+          <ol class="algorithm">
+            <li>Let <code>proof</code> be a copy of <code>securedDocument.proof</code>
+              (the AnonCreds <code>DataIntegrityProof</code> entry).</li>
+            <li>Let <code>tag</code> and <code>payload</code> be the result of
+              <a href="#parse-proof-value">parseProofValue</a> with
+              <code>proof.proofValue</code>. If <code>tag</code> is not <code>1</code>,
+              an error <em class="rfc2119">MUST</em> be raised.</li>
+            <li>Let <code>encodedValues</code> be the result of
+              <a href="#encode-credential-attributes">Encode Credential Attributes</a>
+              with <code>securedDocument.credentialSubject</code>.</li>
+            <li>Update <code>payload.signature</code> and
+              <code>payload.signature_correctness_proof</code> by running the
+              [[ANONCREDS]] credential processing procedure with
+              <code>credentialRequestMetadata</code>, <code>linkSecret</code>,
+              <code>credentialDefinition</code>, <code>encodedValues</code>, and
+              optional revocation registry state from <code>payload</code>.</li>
+            <li>Let <code>proofConfig</code> be the result of
+              <a href="#proof-configuration">Proof Configuration</a> with
+              <code>options</code> and <code>processCredential</code>.</li>
+            <li>Set <code>proof.verificationMethod</code> to
+              <code>payload.cred_def_id</code>.</li>
+            <li>Set <code>proof.proofPurpose</code> to
+              <code>proofConfig.proofPurpose</code>.</li>
+            <li>Set <code>proof.proofValue</code> to the result of
+              <a href="#serialize-proof-value">serializeProofValue</a> with tag
+              <code>1</code> and the updated <code>payload</code>.</li>
+            <li>Return <code>proof</code>.</li>
+          </ol>
+        </section>
+
+        <section id="create-presentation-proofs">
+          <h4>Create Presentation Proofs (anoncreds-2023)</h4>
+          <p>
+            Called by the [[ANONCREDS]] holder to build a verifiable presentation.
+            Required inputs are proof options (<code>options</code>) and presentation
+            parameters:
+          </p>
+          <ul>
+            <li><code>presentationRequest</code></li>
+            <li><code>sourceCredentials</code> — secured credentials each carrying a
+              processed tag <code>1</code> proof</li>
+            <li><code>credentialsProve</code> — attributes and predicates to prove per
+              credential</li>
+            <li><code>linkSecret</code></li>
+            <li><code>schemas</code> and <code>credentialDefinitions</code> maps</li>
+          </ul>
+          <p>
+            A verifiable presentation structure (embedded credentials with tag
+            <code>2</code> proofs plus a top-level tag <code>3</code> proof) is
+            produced as output. This matches
+            <code>w3c::prover::create_presentation</code> in anoncreds-rs.
+          </p>
+          <ol class="algorithm">
+            <li>Initialize a CL presentation builder from
+              <code>presentationRequest</code>, <code>schemas</code>, and
+              <code>credentialDefinitions</code> per [[ANONCREDS]].</li>
+            <li>For each entry in <code>sourceCredentials</code> paired with
+              <code>credentialsProve</code>:
+              <ol>
+                <li>Parse the source credential's <code>proofValue</code> and obtain tag
+                  <code>1</code> <code>payload</code>.</li>
+                <li>Let <code>encodedValues</code> be the result of
+                  <a href="#encode-credential-attributes">Encode Credential Attributes</a>
+                  on the source <code>credentialSubject</code>.</li>
+                <li>Add a CL sub-proof to the builder using <code>payload.signature</code>,
+                  <code>linkSecret</code> (or a per-credential override),
+                  <code>credentialsProve</code>, <code>payload.schema_id</code>,
+                  <code>payload.cred_def_id</code>, and optional
+                  <code>payload.rev_reg_id</code>.</li>
+              </ol>
+            </li>
+            <li>Let <code>clPresentation</code> be the result of finalizing the builder
+              (sub-proofs and aggregated proof) per [[ANONCREDS]].</li>
+            <li>For each source credential, construct a derived credential document:
+              <ol>
+                <li>Let <code>credentialSubject</code> contain revealed attributes and
+                  predicate markers required by <code>presentationRequest</code>.</li>
+                <li>Let <code>subPayload</code> contain <code>schema_id</code>,
+                  <code>cred_def_id</code>, optional <code>rev_reg_id</code> and
+                  <code>timestamp</code>, and <code>sub_proof</code> from
+                  <code>clPresentation</code>.</li>
+                <li>Attach a <code>DataIntegrityProof</code> with
+                  <code>proofPurpose</code> <code>assertionMethod</code>,
+                  <code>verificationMethod</code> set to
+                  <code>subPayload.cred_def_id</code>, and <code>proofValue</code>
+                  from <a href="#serialize-proof-value">serializeProofValue</a> with
+                  tag <code>2</code> and <code>subPayload</code>.</li>
+              </ol>
+            </li>
+            <li>Let <code>aggregatedPayload</code> be
+              <code>{ aggregated: clPresentation.aggregated_proof }</code>.</li>
+            <li>Let <code>presentationProof</code> be a <code>DataIntegrityProof</code> with:
+              <ul>
+                <li><code>proofPurpose</code> <code>authentication</code></li>
+                <li><code>challenge</code> set to <code>presentationRequest.nonce</code></li>
+                <li><code>verificationMethod</code> set to the
+                  <code>cred_def_id</code> of the last processed source credential</li>
+                <li><code>proofValue</code> from
+                  <a href="#serialize-proof-value">serializeProofValue</a> with tag
+                  <code>3</code> and <code>aggregatedPayload</code></li>
+              </ul>
+            </li>
+            <li>Return the presentation object containing
+              <code>verifiableCredential</code> and <code>proof:
+              presentationProof</code>.</li>
+          </ol>
+          <p class="note">
+            When multiple source credentials are used, anoncreds-rs currently sets the
+            top-level <code>verificationMethod</code> to the
+            <code>cred_def_id</code> of the last credential in the iteration order.
+            Verifiers resolve CL keys from the credential definitions referenced inside
+            each sub-proof payload.
+          </p>
+        </section>
+
+        <section id="verify-proof-anoncreds-2023">
+          <h4>Verify Proof (anoncreds-2023)</h4>
+          <p>
+            <em>To be defined.</em> Will parse <code>proofValue</code>, dispatch on proof
+            tag, and delegate to [[ANONCREDS]] presentation verification (matching
+            <code>w3c::verifier::verify_presentation</code> in anoncreds-rs).
+          </p>
+        </section>
       </section>
     </section>
 
