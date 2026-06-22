@@ -1,0 +1,8 @@
+{
+  "name": "vc-di-anoncreds",
+  "private": true,
+  "description": "AnonCreds Data Integrity Cryptosuites specification (ReSpec)",
+  "scripts": {
+    "serve": "npx --yes serve ."
+  }
+}
